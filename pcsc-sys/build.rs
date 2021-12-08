@@ -19,6 +19,10 @@ fn main() {
             println!("cargo:rustc-link-lib=framework=PCSC");
         }
 
+        /// For mobile build do nothing as it will be linked with rust implementation of the lib.
+        "android" => {}
+        "ios" => {}
+
         _ => {
             if let Ok(lib_dir) = env::var("PCSC_LIB_DIR") {
                 println!("cargo:rustc-link-search=native={}", lib_dir);

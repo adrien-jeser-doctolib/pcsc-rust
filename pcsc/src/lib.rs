@@ -346,6 +346,23 @@ pub enum Error {
     // </contiguous block 2>
 }
 
+impl<T> From<std::sync::PoisonError<T>> for Error
+    where
+        T: std::fmt::Debug,
+{
+    fn from(_poison: std::sync::PoisonError<T>) -> Self {
+        //error!("BLE context lock error");
+        Error::InternalError
+    }
+}
+
+impl From<std::ffi::NulError> for Error {
+    fn from(_: std::ffi::NulError) -> Self {
+        //error!("CString null error");
+        Error::UnknownError
+    }
+}
+
 impl Error {
     fn from_raw(raw: LONG) -> Error {
         unsafe {
@@ -543,6 +560,10 @@ pub enum Attribute {
 impl Attribute {
     fn into_raw(self) -> DWORD {
         DWORD::from(self as u32)
+    }
+
+    pub fn from_raw(raw: DWORD) -> Attribute {
+        unsafe { transmute::<u32, Attribute>(raw as u32) }
     }
 }
 
