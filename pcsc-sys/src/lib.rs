@@ -31,25 +31,25 @@
 #![allow(overflowing_literals)]
 
 use std::os::raw::{c_char, c_void};
-#[cfg(not(any(target_os = "macos", target_os = "android", target_os = "ios")))]
+#[cfg(not(target_os = "macos"))]
 use std::os::raw::{c_long, c_ulong, c_uchar, c_ushort};
 
-#[cfg(not(any(target_os = "macos", target_os = "android", target_os = "ios")))]
+#[cfg(not(target_os = "macos"))]
 pub type WORD = c_ushort;
-#[cfg(not(any(target_os = "macos", target_os = "android", target_os = "ios")))]
+#[cfg(not(target_os = "macos"))]
 pub type DWORD = c_ulong;
-#[cfg(not(any(target_os = "macos", target_os = "android", target_os = "ios")))]
+#[cfg(not(target_os = "macos"))]
 pub type LONG = c_long;
-#[cfg(not(any(target_os = "macos", target_os = "android", target_os = "ios")))]
+#[cfg(not(target_os = "macos"))]
 pub type ULONG = c_ulong;
 
-#[cfg(any(target_os = "macos", target_os = "android", target_os = "ios"))]
+#[cfg(target_os = "macos")]
 pub type WORD = u16;
-#[cfg(any(target_os = "macos", target_os = "android", target_os = "ios"))]
+#[cfg(target_os = "macos")]
 pub type DWORD = u32;
-#[cfg(any(target_os = "macos", target_os = "android", target_os = "ios"))]
+#[cfg(target_os = "macos")]
 pub type LONG = i32;
-#[cfg(any(target_os = "macos", target_os = "android", target_os = "ios"))]
+#[cfg(target_os = "macos")]
 pub type ULONG = u32;
 
 #[cfg(target_os = "windows")]
