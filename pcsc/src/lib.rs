@@ -567,6 +567,13 @@ impl Attribute {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct PcscAttrVersion {
+    pub major: u8,
+    pub minor: u8,
+    pub build_number: u16,
+}
+
 /// Maximum amount of bytes in an ATR.
 pub const MAX_ATR_SIZE: usize = ffi::MAX_ATR_SIZE;
 /// Maximum amount of bytes in a short APDU command or response.

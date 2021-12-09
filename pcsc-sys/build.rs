@@ -19,7 +19,7 @@ fn main() {
             println!("cargo:rustc-link-lib=framework=PCSC");
         }
 
-        /// For mobile build do nothing as it will be linked with rust implementation of the lib.
+        // For mobile build do nothing as it will be linked with rust implementation of the lib.
         "android" => {}
         "ios" => {}
 
