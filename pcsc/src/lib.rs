@@ -351,14 +351,12 @@ impl<T> From<std::sync::PoisonError<T>> for Error
         T: std::fmt::Debug,
 {
     fn from(_poison: std::sync::PoisonError<T>) -> Self {
-        //error!("BLE context lock error");
         Error::InternalError
     }
 }
 
 impl From<std::ffi::NulError> for Error {
     fn from(_: std::ffi::NulError) -> Self {
-        //error!("CString null error");
         Error::UnknownError
     }
 }
