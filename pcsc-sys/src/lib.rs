@@ -32,8 +32,10 @@
 
 use std::os::raw::{c_char, c_void};
 #[cfg(not(target_os = "macos"))]
-use std::os::raw::{c_long, c_ulong};
+use std::os::raw::{c_long, c_ulong, c_uchar, c_ushort};
 
+#[cfg(not(target_os = "macos"))]
+pub type WORD = c_ushort;
 #[cfg(not(target_os = "macos"))]
 pub type DWORD = c_ulong;
 #[cfg(not(target_os = "macos"))]
@@ -41,6 +43,8 @@ pub type LONG = c_long;
 #[cfg(not(target_os = "macos"))]
 pub type ULONG = c_ulong;
 
+#[cfg(target_os = "macos")]
+pub type WORD = u16;
 #[cfg(target_os = "macos")]
 pub type DWORD = u32;
 #[cfg(target_os = "macos")]
@@ -208,8 +212,8 @@ pub const SCARD_ATR_LENGTH: usize = MAX_ATR_SIZE;
 pub const MAX_BUFFER_SIZE: usize = 264;
 pub const MAX_BUFFER_SIZE_EXTENDED: usize = 4 + 3 + (1 << 16) + 3 + 2;
 
-#[cfg_attr(not(target_os = "macos"), repr(C))]
-#[cfg_attr(target_os = "macos", repr(C, packed))]
+#[cfg_attr(not(any(target_os = "macos", target_os = "android", target_os = "ios")), repr(C))]
+#[cfg_attr(any(target_os = "macos", target_os = "android", target_os = "ios"), repr(C, packed))]
 pub struct SCARD_IO_REQUEST {
     pub dwProtocol: DWORD,
     pub cbPciLength: DWORD,
@@ -220,8 +224,8 @@ pub const ATR_BUFFER_SIZE: usize = MAX_ATR_SIZE;
 #[cfg(target_os = "windows")]
 pub const ATR_BUFFER_SIZE: usize = 36;
 
-#[cfg_attr(not(target_os = "macos"), repr(C))]
-#[cfg_attr(target_os = "macos", repr(C, packed))]
+#[cfg_attr(not(any(target_os = "macos", target_os = "android", target_os = "ios")), repr(C))]
+#[cfg_attr(any(target_os = "macos", target_os = "android", target_os = "ios"), repr(C, packed))]
 pub struct SCARD_READERSTATE {
     pub szReader: *const c_char,
     pub pvUserData: *mut c_void,
@@ -300,6 +304,16 @@ pub const SCARD_ATTR_SUPRESS_T1_IFS_REQUEST: DWORD = SCARD_ATTR_VALUE!(SCARD_CLA
 // Assumes ASCII.
 pub const SCARD_ATTR_DEVICE_FRIENDLY_NAME: DWORD = SCARD_ATTR_DEVICE_FRIENDLY_NAME_A;
 pub const SCARD_ATTR_DEVICE_SYSTEM_NAME: DWORD = SCARD_ATTR_DEVICE_SYSTEM_NAME_A;
+
+// To help fulfill SCARD_ATTR_CHANNEL_ID attribute
+pub const SCARD_READER_TYPE_SERIAL: WORD = 0x01;
+pub const SCARD_READER_TYPE_PARALELL: WORD = 0x02;
+pub const SCARD_READER_TYPE_KEYBOARD: WORD = 0x04;
+pub const SCARD_READER_TYPE_SCSI: WORD = 0x08;
+pub const SCARD_READER_TYPE_IDE: WORD = 0x10;
+pub const SCARD_READER_TYPE_USB: WORD = 0x20;
+pub const SCARD_READER_TYPE_PCMCIA: WORD = 0x40;
+pub const SCARD_READER_TYPE_VENDOR: WORD = 0xF0;
 
 #[cfg(target_os = "windows")]
 pub fn SCARD_CTL_CODE(code: DWORD) -> DWORD {
