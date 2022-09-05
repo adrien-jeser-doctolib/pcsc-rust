@@ -1037,6 +1037,11 @@ impl ReaderState {
     pub fn atr(&self) -> &[u8] {
         &self.inner.rgbAtr[0..self.inner.cbAtr as usize]
     }
+    
+    /// The last current state that was set.
+    pub fn current_state(&self) -> State {
+        State::from_bits_truncate(self.inner.dwCurrentState)
+    }
 
     /// The last reported state.
     pub fn event_state(&self) -> State {
@@ -1194,6 +1199,41 @@ impl Card {
             ));
 
             Ok(Transaction {
+                card: self,
+            })
+        }
+    }
+
+    /// Start a new exclusive transaction with the card.
+    ///
+    /// Operations on the card for the duration of the transaction
+    /// can only be performed through the returned `Transaction`.
+    ///
+    /// This function is like [`Card::transaction`], but also returns the
+    /// reference to `self` on error. When starting a transaction, you might
+    /// want to deal with transient errors, like [`Error::ResetCard`], by
+    /// reconnecting to the card, and retrying the transaction. When this
+    /// functionality is wrapped, this doesn't work, because mutable references
+    /// can't be reborrowed (at least in current Rust). This function returns
+    /// the reference, which allows this construct.
+    ///
+    /// This function wraps `SCardBeginTransaction` ([pcsclite][1],
+    /// [MSDN][2]).
+    ///
+    /// [1]: https://pcsclite.apdu.fr/api/group__API.html#gaddb835dce01a0da1d6ca02d33ee7d861
+    /// [2]: https://msdn.microsoft.com/en-us/library/aa379469.aspx
+    pub fn transaction2(
+        &mut self,
+    ) -> Result<Transaction, (&mut Self, Error)> {
+        unsafe {
+            let err = ffi::SCardBeginTransaction(
+                self.handle,
+            );
+            if err != ffi::SCARD_S_SUCCESS {
+                return Err((self, Error::from_raw(err)));
+            }
+
+            return Ok(Transaction {
                 card: self,
             })
         }
@@ -1539,6 +1579,43 @@ impl Card {
         send_buffer: &[u8],
         receive_buffer: &'buf mut [u8],
     ) -> Result<&'buf [u8], Error> {
+        self.transmit2(send_buffer, receive_buffer).map_err(|(err, _)| err)
+    }
+
+    /// Transmit an APDU command to the card.
+    ///
+    /// This functions works like [transmit](#method.transmit) but the error type is
+    /// `(Error, usize)`.
+    ///
+    /// `receive_buffer` is a buffer that should be large enough to hold
+    /// the APDU response.
+    ///
+    /// Returns a slice into `receive_buffer` containing the APDU
+    /// response.
+    ///
+    /// If `receive_buffer` is not large enough to hold the APDU response,
+    /// `Error::InsufficientBuffer` is returned, and the `usize` value is set to the
+    /// required size.
+    ///
+    /// `usize` value of the error has no meaning for other `Error` values than `Error::InsufficientBuffer`.
+    ///
+    /// **Note** that when `Error::InsufficientBuffer` is returned, the provided command has
+    /// been already effectively executed by the card. Do not treat this as a generic way to
+    /// obtain the size of the response as you may end up issuing commands multiple times
+    /// which can lead to unexpected results. Normally, most operations on standard card
+    /// let you know the expected size of the response in advance. Be sure to only use this
+    /// for commands that may be executed multiple times in a row without changing the state
+    /// of the card.
+    ///
+    /// This function wraps `SCardTransmit` ([pcsclite][1], [MSDN][2]).
+    ///
+    /// [1]: https://pcsclite.apdu.fr/api/group__API.html#ga9a2d77242a271310269065e64633ab99
+    /// [2]: https://msdn.microsoft.com/en-us/library/aa379804.aspx
+    pub fn transmit2<'buf>(
+        &self,
+        send_buffer: &[u8],
+        receive_buffer: &'buf mut [u8],
+    ) -> Result<&'buf [u8], (Error, usize)> {
         let active_protocol = self.active_protocol.expect(
             "pcsc::Card::transmit() does not work with direct connections"
         );
@@ -1550,7 +1627,7 @@ impl Card {
         unsafe {
             assert!(send_buffer.len() <= std::u32::MAX as usize);
 
-            try_pcsc!(ffi::SCardTransmit(
+            let r = ffi::SCardTransmit(
                 self.handle,
                 send_pci,
                 send_buffer.as_ptr(),
@@ -1558,7 +1635,12 @@ impl Card {
                 recv_pci,
                 receive_buffer.as_mut_ptr(),
                 &mut receive_len,
-            ));
+            );
+
+            match r {
+                ffi::SCARD_S_SUCCESS => (),
+                err => return Err((Error::from_raw(err), receive_len as usize)),
+            }
 
             Ok(&receive_buffer[0..receive_len as usize])
         }
