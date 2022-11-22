@@ -1180,6 +1180,11 @@ impl CardStatusOwned {
 }
 
 impl Card {
+    /// Get the value of the card's active protocol
+    pub fn active_protocol(&self) -> Option<Protocol> {
+        self.active_protocol
+    }
+
     /// Start a new exclusive transaction with the card.
     ///
     /// Operations on the card for the duration of the transaction
