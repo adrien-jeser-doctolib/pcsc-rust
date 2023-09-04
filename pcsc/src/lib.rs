@@ -36,7 +36,7 @@
 //! standard. The commands themselves vary based on the application on the
 //! card.
 //!
-//! [6]: http://www.cardwerk.com/smartcards/smartcard_standard_ISO7816-4.aspx
+//! [6]: https://cardwerk.com/iso-7816-part-4/
 //!
 //! ## Note on portability
 //!
@@ -100,16 +100,15 @@
 //! [8]: https://msdn.microsoft.com/en-us/library/ms953432.aspx#smartcardcspcook_topic2
 #![allow(deprecated)]
 
-#[macro_use]
-extern crate bitflags;
-extern crate pcsc_sys as ffi;
-
 use std::ffi::{CStr, CString};
 use std::mem::{forget, transmute};
 use std::ops::Deref;
 use std::os::raw::c_char;
 use std::ptr::{null, null_mut};
 use std::sync::Arc;
+
+use bitflags::bitflags;
+use pcsc_sys as ffi;
 
 use ffi::{DWORD, LONG};
 
@@ -362,6 +361,7 @@ impl From<std::ffi::NulError> for Error {
 }
 
 impl Error {
+    #[allow(clippy::manual_range_contains)]
     fn from_raw(raw: LONG) -> Error {
         unsafe {
             // The ranges here are the "blocks" above.
@@ -404,7 +404,9 @@ impl std::error::Error for Error {
             Error::NoSmartcard => "The operation requires a Smart Card, but no Smart Card is currently in the device",
             Error::UnknownCard => "The specified smart card name is not recognized",
             Error::CantDispose => "The system could not dispose of the media in the requested manner",
-            Error::ProtoMismatch => "The requested protocols are incompatible with the protocol currently in use with the smart card",
+            Error::ProtoMismatch => {
+                "The requested protocols are incompatible with the protocol currently in use with the smart card"
+            }
             Error::NotReady => "The reader or smart card is not ready to accept commands",
             Error::InvalidValue => "One or more of the supplied parameters values could not be properly interpreted",
             Error::SystemCancelled => "The action was cancelled by the system, presumably to log off or shut down",
@@ -440,14 +442,20 @@ impl std::error::Error for Error {
             Error::CommDataLost => "A communications error with the smart card has been detected. Retry the operation",
             Error::NoKeyContainer => "The requested key container does not exist on the smart card",
             Error::ServerTooBusy => "The smart card resource manager is too busy to complete this operation",
-            Error::UnsupportedCard => "The reader cannot communicate with the card, due to ATR string configuration conflicts",
+            Error::UnsupportedCard => {
+                "The reader cannot communicate with the card, due to ATR string configuration conflicts"
+            }
             Error::UnresponsiveCard => "The smart card is not responding to a reset",
-            Error::UnpoweredCard => "Power has been removed from the smart card, so that further communication is not possible",
+            Error::UnpoweredCard => {
+                "Power has been removed from the smart card, so that further communication is not possible"
+            }
             Error::ResetCard => "The smart card has been reset, so any shared state information is invalid",
             Error::RemovedCard => "The smart card has been removed, so further communication is not possible",
             Error::SecurityViolation => "Access was denied because of a security violation",
             Error::WrongChv => "The card cannot be accessed because the wrong PIN was presented",
-            Error::ChvBlocked => "The card cannot be accessed because the maximum number of PIN entry attempts has been reached",
+            Error::ChvBlocked => {
+                "The card cannot be accessed because the maximum number of PIN entry attempts has been reached"
+            }
             Error::Eof => "The end of the smart card file has been reached",
             Error::CancelledByUser => r#"The user pressed "Cancel" on a Smart Card Selection Dialog"#,
             Error::CardNotAuthenticated => "No PIN was presented to the smart card",
@@ -465,10 +473,12 @@ impl std::fmt::Display for Error {
 }
 
 macro_rules! try_pcsc {
-    ($e:expr) => (match $e {
-        ffi::SCARD_S_SUCCESS => (),
-        err => return Err(Error::from_raw(err)),
-    });
+    ($e:expr) => {
+        match $e {
+            ffi::SCARD_S_SUCCESS => (),
+            err => return Err(Error::from_raw(err)),
+        }
+    };
 }
 
 /// Scope of a context.
@@ -697,9 +707,7 @@ impl Context {
     ///
     /// [1]: https://pcsclite.apdu.fr/api/group__API.html#gaa1b8970169fd4883a6dc4a8f43f19b67
     /// [2]: https://msdn.microsoft.com/en-us/library/aa379479.aspx
-    pub fn establish(
-        scope: Scope,
-    ) -> Result<Context, Error> {
+    pub fn establish(scope: Scope) -> Result<Context, Error> {
         unsafe {
             let mut handle: ffi::SCARDCONTEXT = DUMMY_LONG as ffi::SCARDCONTEXT;
 
@@ -711,9 +719,7 @@ impl Context {
             ));
 
             Ok(Context {
-                inner: Arc::new(ContextInner {
-                    handle,
-                }),
+                inner: Arc::new(ContextInner { handle }),
             })
         }
     }
@@ -737,15 +743,11 @@ impl Context {
     ///
     /// If the `Context` was cloned, and a clone is still alive, this
     /// function will fail with `Error::CantDispose`.
-    pub fn release(
-        self
-    ) -> Result<(), (Context, Error)> {
+    pub fn release(self) -> Result<(), (Context, Error)> {
         match Arc::try_unwrap(self.inner) {
             Ok(inner) => {
                 unsafe {
-                    let err = ffi::SCardReleaseContext(
-                        inner.handle,
-                    );
+                    let err = ffi::SCardReleaseContext(inner.handle);
                     if err != ffi::SCARD_S_SUCCESS {
                         let context = Context { inner: Arc::new(inner) };
                         return Err((context, Error::from_raw(err)));
@@ -756,7 +758,7 @@ impl Context {
 
                     Ok(())
                 }
-            },
+            }
             Err(arc_inner) => {
                 let context = Context { inner: arc_inner };
                 Err((context, Error::CantDispose))
@@ -771,13 +773,9 @@ impl Context {
     ///
     /// [1]: https://pcsclite.apdu.fr/api/group__API.html#ga722eb66bcc44d391f700ff9065cc080b
     /// [2]: https://msdn.microsoft.com/en-us/library/aa379788.aspx
-    pub fn is_valid(
-        &self
-    ) -> Result<(), Error> {
+    pub fn is_valid(&self) -> Result<(), Error> {
         unsafe {
-            try_pcsc!(ffi::SCardIsValidContext(
-                self.inner.handle,
-            ));
+            try_pcsc!(ffi::SCardIsValidContext(self.inner.handle,));
 
             Ok(())
         }
@@ -791,13 +789,9 @@ impl Context {
     ///
     /// [1]: https://pcsclite.apdu.fr/api/group__API.html#gaacbbc0c6d6c0cbbeb4f4debf6fbeeee6
     /// [2]: https://msdn.microsoft.com/en-us/library/aa379470.aspx
-    pub fn cancel(
-        &self,
-    ) -> Result<(), Error> {
+    pub fn cancel(&self) -> Result<(), Error> {
         unsafe {
-            try_pcsc!(ffi::SCardCancel(
-                self.inner.handle,
-            ));
+            try_pcsc!(ffi::SCardCancel(self.inner.handle,));
 
             Ok(())
         }
@@ -819,10 +813,7 @@ impl Context {
     ///
     /// [1]: https://pcsclite.apdu.fr/api/group__API.html#ga93b07815789b3cf2629d439ecf20f0d9
     /// [2]: https://msdn.microsoft.com/en-us/library/aa379793.aspx
-    pub fn list_readers<'buf>(
-        &self,
-        buffer: &'buf mut [u8],
-    ) -> Result<ReaderNames<'buf>, Error> {
+    pub fn list_readers<'buf>(&self, buffer: &'buf mut [u8]) -> Result<ReaderNames<'buf>, Error> {
         unsafe {
             assert!(buffer.len() <= std::u32::MAX as usize);
             let mut buflen = buffer.len() as DWORD;
@@ -834,10 +825,7 @@ impl Context {
                 &mut buflen,
             );
             if err == Error::NoReadersAvailable.into_raw() {
-                return Ok(ReaderNames {
-                    buf: b"\0",
-                    pos: 0,
-                });
+                return Ok(ReaderNames { buf: b"\0", pos: 0 });
             }
             if err != ffi::SCARD_S_SUCCESS {
                 return Err(Error::from_raw(err));
@@ -856,18 +844,11 @@ impl Context {
     ///
     /// [1]: https://pcsclite.apdu.fr/api/group__API.html#ga93b07815789b3cf2629d439ecf20f0d9
     /// [2]: https://msdn.microsoft.com/en-us/library/aa379793.aspx
-    pub fn list_readers_len(
-        &self,
-    ) -> Result<usize, Error> {
+    pub fn list_readers_len(&self) -> Result<usize, Error> {
         unsafe {
             let mut buflen = DUMMY_DWORD;
 
-            let err = ffi::SCardListReaders(
-                self.inner.handle,
-                null(),
-                null_mut(),
-                &mut buflen,
-            );
+            let err = ffi::SCardListReaders(self.inner.handle, null(), null_mut(), &mut buflen);
             if err == Error::NoReadersAvailable.into_raw() {
                 return Ok(0);
             }
@@ -900,12 +881,7 @@ impl Context {
     ///
     /// [1]: https://pcsclite.apdu.fr/api/group__API.html#ga4e515829752e0a8dbc4d630696a8d6a5
     /// [2]: https://msdn.microsoft.com/en-us/library/aa379473.aspx
-    pub fn connect(
-        &self,
-        reader: &CStr,
-        share_mode: ShareMode,
-        preferred_protocols: Protocols,
-    ) -> Result<Card, Error> {
+    pub fn connect(&self, reader: &CStr, share_mode: ShareMode, preferred_protocols: Protocols) -> Result<Card, Error> {
         unsafe {
             let mut handle: ffi::SCARDHANDLE = DUMMY_LONG as ffi::SCARDHANDLE;
             let mut raw_active_protocol: DWORD = DUMMY_DWORD;
@@ -947,20 +923,19 @@ impl Context {
     ///
     /// [1]: https://pcsclite.apdu.fr/api/group__API.html#ga33247d5d1257d59e55647c3bb717db24
     /// [2]: https://msdn.microsoft.com/en-us/library/aa379773.aspx
-    pub fn get_status_change<D>(
-        &self,
-        timeout: D,
-        readers: &mut [ReaderState],
-    ) -> Result<(), Error>
-        where D: Into<Option<std::time::Duration>> {
+    pub fn get_status_change<D>(&self, timeout: D, readers: &mut [ReaderState]) -> Result<(), Error>
+    where
+        D: Into<Option<std::time::Duration>>,
+    {
         let timeout_ms = match timeout.into() {
             Some(duration) => {
-                let timeout_ms_u64 = duration.as_secs()
+                let timeout_ms_u64 = duration
+                    .as_secs()
                     .saturating_mul(1000)
                     .saturating_add(u64::from(duration.subsec_nanos()) / 1_000_000);
                 std::cmp::min(ffi::INFINITE, timeout_ms_u64 as DWORD)
-            },
-            None => ffi::INFINITE
+            }
+            None => ffi::INFINITE,
         };
 
         unsafe {
@@ -983,9 +958,7 @@ impl Drop for ContextInner {
         unsafe {
             // Error is ignored here; to do proper error handling,
             // release() should be called manually.
-            let _err = ffi::SCardReleaseContext(
-                self.handle,
-            );
+            let _err = ffi::SCardReleaseContext(self.handle);
         }
     }
 }
@@ -1009,10 +982,7 @@ unsafe impl Sync for Context {}
 impl ReaderState {
     /// Create a ReaderState for a card reader with a given presumed
     /// state.
-    pub fn new<T: Into<CString>>(
-        name: T,
-        current_state: State,
-    ) -> ReaderState {
+    pub fn new<T: Into<CString>>(name: T, current_state: State) -> ReaderState {
         ReaderState {
             inner: ffi::SCARD_READERSTATE {
                 szReader: name.into().into_raw(),
@@ -1037,7 +1007,7 @@ impl ReaderState {
     pub fn atr(&self) -> &[u8] {
         &self.inner.rgbAtr[0..self.inner.cbAtr as usize]
     }
-    
+
     /// The last current state that was set.
     pub fn current_state(&self) -> State {
         State::from_bits_truncate(self.inner.dwCurrentState)
@@ -1072,6 +1042,9 @@ impl Drop for ReaderState {
         unsafe { CString::from_raw(self.inner.szReader as *mut c_char) };
     }
 }
+
+unsafe impl Send for ReaderState {}
+unsafe impl Sync for ReaderState {}
 
 /// Status of a card in a card reader.
 #[derive(Clone, Debug)]
@@ -1114,9 +1087,8 @@ impl<'names_buf, 'atr_buf> CardStatus<'names_buf, 'atr_buf> {
     /// This function panics when connected to a reader directly without an
     /// active protocol. Use `protocol2()` instead if you want to avoid this.
     pub fn protocol(&self) -> Protocol {
-        self.protocol.expect(
-            "pcsc::CardStatus::protocol() does not support direct connections; use protocol2() instead"
-        )
+        self.protocol
+            .expect("pcsc::CardStatus::protocol() does not support direct connections; use protocol2() instead")
     }
 
     /// The current ATR string of the card.
@@ -1168,9 +1140,8 @@ impl CardStatusOwned {
     /// This function panics when connected to a reader directly without an
     /// active protocol. Use `protocol2()` instead if you want to avoid this.
     pub fn protocol(&self) -> Protocol {
-        self.protocol.expect(
-            "pcsc::CardStatus::protocol() does not support direct connections; use protocol2() instead"
-        )
+        self.protocol
+            .expect("pcsc::CardStatus::protocol() does not support direct connections; use protocol2() instead")
     }
 
     /// The current ATR string of the card.
@@ -1195,17 +1166,11 @@ impl Card {
     ///
     /// [1]: https://pcsclite.apdu.fr/api/group__API.html#gaddb835dce01a0da1d6ca02d33ee7d861
     /// [2]: https://msdn.microsoft.com/en-us/library/aa379469.aspx
-    pub fn transaction(
-        &mut self,
-    ) -> Result<Transaction, Error> {
+    pub fn transaction(&mut self) -> Result<Transaction, Error> {
         unsafe {
-            try_pcsc!(ffi::SCardBeginTransaction(
-                self.handle,
-            ));
+            try_pcsc!(ffi::SCardBeginTransaction(self.handle,));
 
-            Ok(Transaction {
-                card: self,
-            })
+            Ok(Transaction { card: self })
         }
     }
 
@@ -1227,20 +1192,14 @@ impl Card {
     ///
     /// [1]: https://pcsclite.apdu.fr/api/group__API.html#gaddb835dce01a0da1d6ca02d33ee7d861
     /// [2]: https://msdn.microsoft.com/en-us/library/aa379469.aspx
-    pub fn transaction2(
-        &mut self,
-    ) -> Result<Transaction, (&mut Self, Error)> {
+    pub fn transaction2(&mut self) -> Result<Transaction, (&mut Self, Error)> {
         unsafe {
-            let err = ffi::SCardBeginTransaction(
-                self.handle,
-            );
+            let err = ffi::SCardBeginTransaction(self.handle);
             if err != ffi::SCARD_S_SUCCESS {
                 return Err((self, Error::from_raw(err)));
             }
 
-            return Ok(Transaction {
-                card: self,
-            })
+            Ok(Transaction { card: self })
         }
     }
 
@@ -1288,15 +1247,9 @@ impl Card {
     /// using `Disposition::ResetCard`; you only need to call this
     /// function if you want to handle errors or use a different
     /// disposition method.
-    pub fn disconnect(
-        mut self,
-        disposition: Disposition,
-    ) -> Result<(), (Card, Error)> {
+    pub fn disconnect(mut self, disposition: Disposition) -> Result<(), (Card, Error)> {
         unsafe {
-            let err = ffi::SCardDisconnect(
-                self.handle,
-                disposition.into_raw(),
-            );
+            let err = ffi::SCardDisconnect(self.handle, disposition.into_raw());
             if err != ffi::SCARD_S_SUCCESS {
                 return Err((self, Error::from_raw(err)));
             }
@@ -1324,10 +1277,8 @@ impl Card {
     ///
     /// [1]: https://pcsclite.apdu.fr/api/group__API.html#gae49c3c894ad7ac12a5b896bde70d0382
     /// [2]: https://msdn.microsoft.com/en-us/library/aa379803.aspx
-    #[deprecated(since="2.3.0", note="Use status2() or status2_owned() instead.")]
-    pub fn status(
-        &self,
-    ) -> Result<(Status, Protocol), Error> {
+    #[deprecated(since = "2.3.0", note = "Use status2() or status2_owned() instead.")]
+    pub fn status(&self) -> Result<(Status, Protocol), Error> {
         unsafe {
             let mut raw_status: DWORD = DUMMY_DWORD;
             let mut raw_protocol: DWORD = DUMMY_DWORD;
@@ -1344,9 +1295,8 @@ impl Card {
 
             let status = Status::from_raw(raw_status);
 
-            let protocol = Protocol::from_raw(raw_protocol).expect(
-                "pcsc::Card::status() does not support direct connections; use status2() instead"
-            );
+            let protocol = Protocol::from_raw(raw_protocol)
+                .expect("pcsc::Card::status() does not support direct connections; use status2() instead");
 
             Ok((status, protocol))
         }
@@ -1413,9 +1363,7 @@ impl Card {
     ///
     /// [1]: https://pcsclite.apdu.fr/api/group__API.html#gae49c3c894ad7ac12a5b896bde70d0382
     /// [2]: https://msdn.microsoft.com/en-us/library/aa379803.aspx
-    pub fn status2_len(
-        &self,
-    ) -> Result<(usize, usize), Error> {
+    pub fn status2_len(&self) -> Result<(usize, usize), Error> {
         unsafe {
             let mut names_len: DWORD = DUMMY_DWORD;
             let mut raw_state: DWORD = DUMMY_DWORD;
@@ -1452,7 +1400,12 @@ impl Card {
         let (reader_names, state, protocol, atr_len) = {
             let card_status = self.status2(&mut names_buffer, &mut atr_buffer)?;
             let reader_names = card_status.reader_names.map(ToOwned::to_owned).collect();
-            (reader_names, card_status.state, card_status.protocol, card_status.atr.len())
+            (
+                reader_names,
+                card_status.state,
+                card_status.protocol,
+                card_status.atr.len(),
+            )
         };
 
         atr_buffer.truncate(atr_len);
@@ -1480,11 +1433,7 @@ impl Card {
     ///
     /// [1]: https://pcsclite.apdu.fr/api/group__API.html#gaacfec51917255b7a25b94c5104961602
     /// [2]: https://msdn.microsoft.com/en-us/library/aa379559.aspx
-    pub fn get_attribute<'buf>(
-        &self,
-        attribute: Attribute,
-        buffer: &'buf mut [u8],
-    ) -> Result<&'buf [u8], Error> {
+    pub fn get_attribute<'buf>(&self, attribute: Attribute, buffer: &'buf mut [u8]) -> Result<&'buf [u8], Error> {
         unsafe {
             assert!(buffer.len() <= std::u32::MAX as usize);
             let mut attribute_len = buffer.len() as DWORD;
@@ -1506,10 +1455,7 @@ impl Card {
     ///
     /// [1]: https://pcsclite.apdu.fr/api/group__API.html#gaacfec51917255b7a25b94c5104961602
     /// [2]: https://msdn.microsoft.com/en-us/library/aa379559.aspx
-    pub fn get_attribute_len(
-        &self,
-        attribute: Attribute,
-    ) -> Result<usize, Error> {
+    pub fn get_attribute_len(&self, attribute: Attribute) -> Result<usize, Error> {
         unsafe {
             let mut attribute_len = DUMMY_DWORD;
 
@@ -1545,11 +1491,7 @@ impl Card {
     ///
     /// [1]: https://pcsclite.apdu.fr/api/group__API.html#ga060f0038a4ddfd5dd2b8fadf3c3a2e4f
     /// [2]: https://msdn.microsoft.com/en-us/library/aa379801.aspx
-    pub fn set_attribute(
-        &self,
-        attribute: Attribute,
-        attribute_data: &[u8],
-    ) -> Result<(), Error> {
+    pub fn set_attribute(&self, attribute: Attribute, attribute_data: &[u8]) -> Result<(), Error> {
         unsafe {
             assert!(attribute_data.len() <= std::u32::MAX as usize);
 
@@ -1579,11 +1521,7 @@ impl Card {
     ///
     /// [1]: https://pcsclite.apdu.fr/api/group__API.html#ga9a2d77242a271310269065e64633ab99
     /// [2]: https://msdn.microsoft.com/en-us/library/aa379804.aspx
-    pub fn transmit<'buf>(
-        &self,
-        send_buffer: &[u8],
-        receive_buffer: &'buf mut [u8],
-    ) -> Result<&'buf [u8], Error> {
+    pub fn transmit<'buf>(&self, send_buffer: &[u8], receive_buffer: &'buf mut [u8]) -> Result<&'buf [u8], Error> {
         self.transmit2(send_buffer, receive_buffer).map_err(|(err, _)| err)
     }
 
@@ -1621,9 +1559,9 @@ impl Card {
         send_buffer: &[u8],
         receive_buffer: &'buf mut [u8],
     ) -> Result<&'buf [u8], (Error, usize)> {
-        let active_protocol = self.active_protocol.expect(
-            "pcsc::Card::transmit() does not work with direct connections"
-        );
+        let active_protocol = self
+            .active_protocol
+            .expect("pcsc::Card::transmit() does not work with direct connections");
         let send_pci = get_protocol_pci(active_protocol);
         let recv_pci = null_mut();
         assert!(receive_buffer.len() <= std::u32::MAX as usize);
@@ -1706,10 +1644,7 @@ impl Drop for Card {
             //
             // Disposition is hard-coded to ResetCard here; to use
             // another method, disconnect() should be called manually.
-            let _err = ffi::SCardDisconnect(
-                self.handle,
-                Disposition::ResetCard.into_raw(),
-            );
+            let _err = ffi::SCardDisconnect(self.handle, Disposition::ResetCard.into_raw());
         }
     }
 }
@@ -1735,15 +1670,9 @@ impl<'tx> Transaction<'tx> {
     /// transaction using `Disposition::LeaveCard`; you only need to call
     /// this function if you want to handle errors or use a different
     /// disposition method.
-    pub fn end(
-        self,
-        disposition: Disposition,
-    ) -> Result<(), (Transaction<'tx>, Error)> {
+    pub fn end(self, disposition: Disposition) -> Result<(), (Transaction<'tx>, Error)> {
         unsafe {
-            let err = ffi::SCardEndTransaction(
-                self.card.handle,
-                disposition.into_raw(),
-            );
+            let err = ffi::SCardEndTransaction(self.card.handle, disposition.into_raw());
             if err != 0 {
                 return Err((self, Error::from_raw(err)));
             }
@@ -1764,10 +1693,7 @@ impl<'tx> Drop for Transaction<'tx> {
             //
             // Disposition is hard-coded to LeaveCard here; to use
             // another method, end() should be called manually.
-            let _err = ffi::SCardEndTransaction(
-                self.card.handle,
-                Disposition::LeaveCard.into_raw(),
-            );
+            let _err = ffi::SCardEndTransaction(self.card.handle, Disposition::LeaveCard.into_raw());
         }
     }
 }
